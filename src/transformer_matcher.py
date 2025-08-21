@@ -1,5 +1,5 @@
 """
-vLLM을 사용한 지원사업 매칭 시스템
+Transformers를 사용한 지원사업 매칭 시스템
 사용자의 사업분야와 지원사업 정보를 분석하여 적합한 지원사업을 추출합니다.
 """
 
@@ -8,33 +8,50 @@ import os
 from typing import Dict, List, Any
 import logging
 from user import User
-from vllm import LLM, SamplingParams
+from transformers import AutoTokenizer, AutoModelForCausalLM
+import torch
 
 # 로깅 설정
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 
-class VLLMMatcher:
-    """vLLM을 사용한 지원사업 매칭 클래스"""
+class TransformerMatcher:
+    """Transformers를 사용한 지원사업 매칭 클래스"""
     
-    def __init__(self, model_name: str = "K-intelligence/Midm-2.0-Base-Instruct"): ## KT 믿:음 모델을 사용합니다. 
+    def __init__(self, model_name: str = "K-intelligence/Midm-2.0-Base-Instruct"):
         """
         Args:
-            model_name (str): 사용할 vLLM 모델명
+            model_name (str): 사용할 transformers 모델명
         """
         self.model_name = model_name
-        self.llm = None
-        self._initialize_llm()
+        self.tokenizer = None
+        self.model = None
+        self._initialize_model()
     
-    def _initialize_llm(self):
-        """vLLM 모델 초기화"""
+    def _initialize_model(self):
+        """Transformers 모델 초기화"""
         try:
-            logger.info(f"vLLM 모델 초기화 중: {self.model_name}")
-            self.llm = LLM(model=self.model_name)
-            logger.info("vLLM 모델 초기화 완료")
+            logger.info(f"Transformers 모델 초기화 중: {self.model_name}")
+            
+            # 토크나이저 로드
+            self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
+            
+            # 모델 로드 (CPU 사용)
+            self.model = AutoModelForCausalLM.from_pretrained(
+                self.model_name,
+                torch_dtype=torch.float32,
+                device_map="auto" if torch.cuda.is_available() else "cpu"
+            )
+            
+            # 패딩 토큰 설정
+            if self.tokenizer.pad_token is None:
+                self.tokenizer.pad_token = self.tokenizer.eos_token
+            
+            logger.info("Transformers 모델 초기화 완료")
+            
         except Exception as e:
-            logger.error(f"vLLM 모델 초기화 실패: {e}")
+            logger.error(f"Transformers 모델 초기화 실패: {e}")
             raise
     
     def extract_support_programs_info(self, all_categories_file: str) -> Dict[str, List[Dict]]:
@@ -82,7 +99,7 @@ class VLLMMatcher:
             support_programs (List[Dict]): 지원사업 정보 리스트
             
         Returns:
-            str: vLLM 입력용 프롬프트
+            str: transformers 입력용 프롬프트
         """
         # 사용자 정보 요약
         user_info = f"""
@@ -116,9 +133,54 @@ class VLLMMatcher:
         full_prompt = user_info + programs_info + matching_instruction
         return full_prompt
     
+    def generate_response(self, prompt: str, max_length: int = 1000) -> str:
+        """
+        Transformers 모델을 사용하여 응답 생성
+        
+        Args:
+            prompt (str): 입력 프롬프트
+            max_length (int): 최대 토큰 길이
+            
+        Returns:
+            str: 생성된 응답
+        """
+        try:
+            # 입력 토큰화
+            inputs = self.tokenizer(prompt, return_tensors="pt", truncation=True, max_length=512)
+            
+            # GPU 사용 가능시 GPU로 이동
+            if torch.cuda.is_available():
+                inputs = {k: v.cuda() for k, v in inputs.items()}
+                self.model = self.model.cuda()
+            
+            # 생성 파라미터 설정
+            generation_config = {
+                'max_length': max_length,
+                'temperature': 0.1,
+                'top_p': 0.9,
+                'do_sample': True,
+                'pad_token_id': self.tokenizer.eos_token_id
+            }
+            
+            # 응답 생성
+            with torch.no_grad():
+                outputs = self.model.generate(**inputs, **generation_config)
+            
+            # 토큰을 텍스트로 디코딩
+            response = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
+            
+            # 프롬프트 부분 제거하고 응답만 반환
+            response = response[len(prompt):].strip()
+            
+            return response
+            
+        except Exception as e:
+            logger.error(f"응답 생성 실패: {e}")
+            raise
+    
     def match_support_programs(self, user: User, extracted_data: Dict[str, List[Dict]]) -> List[Dict]:
         """
-        vLLM을 사용하여 사용자에게 적합한 지원사업 매칭
+        Transformers를 사용하여 사용자에게 적합한 지원사업 매칭
         
         Args:
             user (User): 사용자 정보
@@ -146,21 +208,14 @@ class VLLMMatcher:
                 logger.warning("사용자 카테고리와 관련된 지원사업이 없습니다.")
                 return []
             
-            # vLLM 프롬프트 생성
+            # Transformers 프롬프트 생성
             prompt = self.create_matching_prompt(user, relevant_programs)
             
-            # vLLM 추론
-            sampling_params = SamplingParams(
-                temperature=0.1,
-                top_p=0.9,
-                max_tokens=1000
-            )
+            # Transformers 추론
+            logger.info("Transformers 매칭 분석 시작...")
+            result = self.generate_response(prompt)
             
-            logger.info("vLLM 매칭 분석 시작...")
-            outputs = self.llm.generate([prompt], sampling_params)
-            result = outputs[0].outputs[0].text
-            
-            logger.info(f"vLLM 분석 결과: {result}")
+            logger.info(f"Transformers 분석 결과: {result}")
             
             # 결과 파싱 및 매칭된 지원사업 추출
             matched_programs = self._parse_matching_result(result, relevant_programs, category_indices)
@@ -171,12 +226,12 @@ class VLLMMatcher:
             logger.error(f"지원사업 매칭 실패: {e}")
             raise
     
-    def _parse_matching_result(self, vllm_result: str, relevant_programs: List[Dict], category_indices: Dict) -> List[Dict]:
+    def _parse_matching_result(self, transformer_result: str, relevant_programs: List[Dict], category_indices: Dict) -> List[Dict]:
         """
-        vLLM 결과를 파싱하여 매칭된 지원사업 추출
+        Transformers 결과를 파싱하여 매칭된 지원사업 추출
         
         Args:
-            vllm_result (str): vLLM 분석 결과
+            transformer_result (str): Transformers 분석 결과
             relevant_programs (List[Dict]): 관련 지원사업 리스트
             category_indices (Dict): 카테고리별 인덱스 매핑
             
@@ -186,7 +241,7 @@ class VLLMMatcher:
         matched_programs = []
         
         # 간단한 파싱 로직 (실제로는 더 정교한 파싱이 필요할 수 있음)
-        lines = vllm_result.strip().split('\n')
+        lines = transformer_result.strip().split('\n')
         
         for line in lines:
             if '지원사업' in line and ':' in line:
@@ -204,7 +259,7 @@ class VLLMMatcher:
         
         # 매칭 결과가 없으면 상위 3개 반환
         if not matched_programs:
-            logger.info("vLLM 매칭 결과가 없어 상위 3개 지원사업을 반환합니다.")
+            logger.info("Transformers 매칭 결과가 없어 상위 3개 지원사업을 반환합니다.")
             matched_programs = relevant_programs[:3]
         
         return matched_programs
@@ -263,18 +318,18 @@ def main():
     
     # 파일 경로 설정
     all_categories_file = "src/all_categories.json"
-    output_file = "src/matched_support_programs.json"
+    output_file = "src/transformer_matched_support_programs.json"
     
     try:
-        # VLLM 매처 초기화
-        matcher = VLLMMatcher()
+        # Transformer 매처 초기화
+        matcher = TransformerMatcher()
         
         # 1. all_categories.json에서 pblancNm과 bsnsSumryCn 추출
         logger.info("지원사업 정보 추출 시작...")
         extracted_data = matcher.extract_support_programs_info(all_categories_file)
         
-        # 2. vLLM을 사용한 매칭
-        logger.info("vLLM 매칭 시작...")
+        # 2. Transformers를 사용한 매칭
+        logger.info("Transformers 매칭 시작...")
         matched_programs = matcher.match_support_programs(user, extracted_data)
         
         # 3. 매칭된 지원사업을 원본 데이터와 함께 저장
