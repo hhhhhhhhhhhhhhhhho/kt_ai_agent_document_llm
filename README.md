@@ -46,9 +46,9 @@
 ---
 
 ## 🛠 Tech Stack
-**Backend**: Python 3.8+  
-**HTTP Client**: requests  
-**AI/ML**: vLLM  
+**Backend**: Python 3.11.9  
+**HTTP Client**: requests 
+**AI/ML**: vLLM , transformer
 **Data Format**: JSON  
 **Logging**: Python logging module  
 
