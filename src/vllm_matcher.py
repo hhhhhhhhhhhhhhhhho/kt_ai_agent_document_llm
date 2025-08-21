@@ -250,41 +250,39 @@ class VLLMMatcher:
             raise
 
 
-def main():
-    """메인 실행 함수"""
-    
-    # 사용자 정보 생성 (예시)
-    user = User(
-        name="테스트 사용자",
-        code="02",
-        main_category=["기술", "경영"],
-        main_business_summary="제 사업은 개인정보 관리실태 컨설팅입니다. 현재 AI를 활용한 자동화 사업에 도전하고 있습니다."
-    )
-    
-    # 파일 경로 설정
-    all_categories_file = "src/all_categories.json"
-    output_file = "src/matched_support_programs.json"
-    
-    try:
-        # VLLM 매처 초기화
-        matcher = VLLMMatcher()
+    def matchig_business_support_program(self,user: User):
+        """메인 실행 함수"""
         
-        # 1. all_categories.json에서 pblancNm과 bsnsSumryCn 추출
-        logger.info("지원사업 정보 추출 시작...")
-        extracted_data = matcher.extract_support_programs_info(all_categories_file)
+        # 사용자 정보 생성 (예시)
+        user = User(
+            name="테스트 사용자",
+            code="02",
+            main_category=["기술", "경영"],
+            main_business_summary="제 사업은 개인정보 관리실태 컨설팅입니다. 현재 AI를 활용한 자동화 사업에 도전하고 있습니다."
+        )
         
-        # 2. vLLM을 사용한 매칭
-        logger.info("vLLM 매칭 시작...")
-        matched_programs = matcher.match_support_programs(user, extracted_data)
+        # 파일 경로 설정
+        all_categories_file = "src/all_categories.json"
+        output_file = "src/matched_support_programs.json"
         
-        # 3. 매칭된 지원사업을 원본 데이터와 함께 저장
-        logger.info("매칭 결과 저장 시작...")
-        matcher.create_matched_output_file(matched_programs, all_categories_file, output_file)
-        
-        logger.info(f"총 {len(matched_programs)}개의 지원사업이 매칭되었습니다.")
-        
-    except Exception as e:
-        logger.error(f"프로세스 실행 중 오류 발생: {e}")
+        try:
+            
+            # 1. all_categories.json에서 pblancNm과 bsnsSumryCn 추출
+            logger.info("지원사업 정보 추출 시작...")
+            extracted_data = self.extract_support_programs_info(all_categories_file)
+            
+            # 2. vLLM을 사용한 매칭
+            logger.info("vLLM 매칭 시작...")
+            matched_programs = self.match_support_programs(user, extracted_data)
+            
+            # 3. 매칭된 지원사업을 원본 데이터와 함께 저장
+            logger.info("매칭 결과 저장 시작...")
+            self.create_matched_output_file(matched_programs, all_categories_file, output_file)
+            
+            logger.info(f"총 {len(matched_programs)}개의 지원사업이 매칭되었습니다.")
+            
+        except Exception as e:
+            logger.error(f"프로세스 실행 중 오류 발생: {e}")
 
 
 if __name__ == "__main__":

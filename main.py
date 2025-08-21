@@ -12,6 +12,26 @@
 
 '''
 
+from src.vllm_matcher import VLLMMatcher
+from src.user import User
+from src.parsing import BizInfoAPI
 
 if __name__ == "__main__":
-    pass
+    
+    biz_parser = BizInfoAPI() ## API 클라이언트 초기화
+    ####################
+    ###테스트 유저셋 생성###
+    user = User("test", "02", ["기술", "경영"],"제 사업은 개인정보 관리실태 컨설팅입니다. 현재 AI 를 활용한 자동화 사업에 도전하고 있습니다.")
+    ####################
+    
+    ####지원사업 파싱 -> json 파일로 출력####
+    biz_parser.categories_list_search(user.category_list)
+
+    #### vLLM 객체 생성 ###
+    vllm_matcher = VLLMMatcher()
+
+    #### vLLM 매칭 실행 ###
+    vllm_matcher.matchig_business_support_program(User("test", "02", ["기술", "경영"],"제 사업은 개인정보 관리실태 컨설팅입니다. 현재 AI 를 활용한 자동화 사업에 도전하고 있습니다."))
+
+    ### OUTPUT -> json 파일로 출력""""
+    
