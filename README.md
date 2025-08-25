@@ -9,6 +9,7 @@
 - [Features](#-features)
 - [Tech Stack](#-tech-stack)
 - [Getting Started](#-getting-started)
+- [Docker Setup](#-docker-setup)
 - [API Documentation](#-api-documentation)
 - [vLLM Matching System](#-vllm-matching-system)
 - [Usage Examples](#-usage-examples)
@@ -42,26 +43,31 @@
 - 📝 **상세한 로깅**: API 요청/응답 과정을 상세히 기록
 - 🛡️ **에러 처리**: 네트워크 오류, API 오류 등에 대한 안전한 처리
 - 🔧 **확장 가능한 구조**: 새로운 기능 추가가 용이한 모듈화된 구조
+- 🐳 **Docker 지원**: 컨테이너화된 배포 및 개발 환경
 
 ---
 
 ## 🛠 Tech Stack
-**Backend**: Python 3.11.9  
-**HTTP Client**: requests 
-**AI/ML**: vLLM , transformer
+**Backend**: Python 3.12  
+**HTTP Client**: requests  
+**AI/ML**: vLLM, Transformers  
 **Data Format**: JSON  
 **Logging**: Python logging module  
+**Container**: Docker, Docker Compose  
 
 ---
 
 ## ⚡ Getting Started
 
 ### Prerequisites
-- Python >= 3.8
+- Python >= 3.12
+- Docker & Docker Compose (선택사항)
 - 기업마당 API 키 (발급 문의: 02-867-9765)
 - GPU (vLLM 사용을 권장)
 
 ### Installation
+
+#### 방법 1: 로컬 설치
 ```bash
 # 1. Clone repository
 git clone https://github.com/username/kt_ai_agent_document_llm.git
@@ -77,6 +83,19 @@ pip install -r requirements.txt
 echo "BIZINFO_API_KEY=your_api_key_here" > .env
 ```
 
+#### 방법 2: Docker 사용 (권장)
+```bash
+# 1. Clone repository
+git clone https://github.com/username/kt_ai_agent_document_llm.git
+
+# 2. Move to project directory
+cd kt_ai_agent_document_llm
+
+# 3. Docker 빌드 및 실행
+./scripts/docker-build.sh
+./scripts/docker-run.sh
+```
+
 ### Quick Start
 ```bash
 # 기본 API 데이터 수집
@@ -85,9 +104,51 @@ python src/parsing.py
 # vLLM 매칭 시스템 테스트
 python src/test_vllm_matcher.py
 
+# Transformers 매칭 시스템 테스트
+python src/test_transformer_matcher.py
+
 # 전체 파이프라인 실행
-python src/vllm_matcher.py
+python main.py
 ```
+
+---
+
+## 🐳 Docker Setup
+
+### Docker 환경 구성
+이 프로젝트는 Python 3.12 기반의 Docker 환경을 제공합니다.
+
+#### 기본 실행
+```bash
+# Docker 이미지 빌드
+./scripts/docker-build.sh
+
+# 컨테이너 실행
+./scripts/docker-run.sh
+```
+
+#### 개발 환경 실행
+```bash
+# 개발용 컨테이너 실행 (소스 코드 변경 시 자동 재시작)
+./scripts/docker-dev.sh
+```
+
+#### 수동 Docker 명령어
+```bash
+# 이미지 빌드
+docker build -t kt-ai-agent .
+
+# 컨테이너 실행
+docker run -it --rm -v $(pwd)/src:/app/src kt-ai-agent
+
+# Docker Compose 실행
+docker-compose up --build
+```
+
+### Docker 환경 변수
+- `PYTHONPATH`: Python 모듈 경로
+- `PYTHONUNBUFFERED`: Python 출력 버퍼링 비활성화
+- `BIZINFO_API_KEY`: 기업마당 API 키
 
 ---
 
@@ -196,6 +257,27 @@ matched_programs = matcher.match_support_programs(user, extracted_data)
 print(f"매칭된 지원사업 수: {len(matched_programs)}")
 ```
 
+### Transformers 매칭 사용법
+```python
+from src.transformer_matcher import TransformerMatcher
+from src.user import User
+
+# 사용자 정보
+user = User(
+    name="AI 스타트업",
+    code="02",
+    main_category=["기술"],
+    main_business_summary="AI 기반 솔루션 개발"
+)
+
+# Transformers 매칭
+matcher = TransformerMatcher()
+extracted_data = matcher.extract_support_programs_info("src/all_categories.json")
+matched_programs = matcher.match_support_programs(user, extracted_data)
+
+print(f"매칭된 지원사업 수: {len(matched_programs)}")
+```
+
 ---
 
 ## 📁 Project Structure
@@ -203,11 +285,20 @@ print(f"매칭된 지원사업 수: {len(matched_programs)}")
 kt_ai_agent_document_llm/
 ├── main.py                    # 메인 실행 파일
 ├── requirements.txt           # Python 의존성
+├── Dockerfile                 # Docker 이미지 설정
+├── docker-compose.yml         # Docker Compose 설정
+├── .dockerignore              # Docker 빌드 제외 파일
 ├── README.md                 # 프로젝트 문서
+├── scripts/                   # 실행 스크립트
+│   ├── docker-build.sh       # Docker 빌드 스크립트
+│   ├── docker-run.sh         # Docker 실행 스크립트
+│   └── docker-dev.sh         # 개발용 Docker 실행 스크립트
 ├── src/                      # 소스 코드 디렉토리
 │   ├── parsing.py            # 기업마당 API 클라이언트
-│   ├── vllm_matcher.py       # vLLM 매칭 시스템 (핵심)
+│   ├── vllm_matcher.py       # vLLM 매칭 시스템
+│   ├── transformer_matcher.py # Transformers 매칭 시스템
 │   ├── test_vllm_matcher.py  # vLLM 매처 테스트
+│   ├── test_transformer_matcher.py # Transformers 매처 테스트
 │   ├── config.py             # 설정 관리
 │   ├── user.py               # 사용자 정보 클래스
 │   ├── user_catergory_mapping.py  # 사용자-카테고리 매핑
