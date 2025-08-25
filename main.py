@@ -31,7 +31,14 @@ if __name__ == "__main__":
     vllm_matcher = VLLMMatcher()
 
     #### vLLM 매칭 실행 ###
-    vllm_matcher.matchig_business_support_program(User("test", "02", ["기술", "경영"],"제 사업은 개인정보 관리실태 컨설팅입니다. 현재 AI 를 활용한 자동화 사업에 도전하고 있습니다."))
-
     ### OUTPUT -> json 파일로 출력""""
+    vllm_matcher.matchig_business_support_program(User("test", "02", ["기술", "경영"],"제 사업은 개인정보 관리실태 컨설팅입니다. 현재 AI 를 활용한 자동화 사업에 도전하고 있습니다."))
+    ###############################
+
+
+    ### JSON 파일 기반 신청서 작성 ###
+    write_support_program()
+    
+    
+    
     
