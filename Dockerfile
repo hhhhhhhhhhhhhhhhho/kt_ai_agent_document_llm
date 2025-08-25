@@ -14,8 +14,8 @@ RUN apt-get update && apt-get install -y \
 # Python 의존성 파일 복사
 COPY requirements.txt .
 
-# NumPy 호환성 문제 해결을 위해 numpy<2 설치
-RUN pip install --no-cache-dir numpy<2
+# NumPy 호환성 문제 해결을 위해 numpy<2 설치 (따옴표로 감싸기)
+RUN pip install --no-cache-dir "numpy<2"
 
 # Python 의존성 설치
 RUN pip install --no-cache-dir -r requirements.txt
