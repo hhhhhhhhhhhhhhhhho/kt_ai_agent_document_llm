@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  ai-agent:
+    build: .
+    container_name: kt_ai_agent
+    volumes:
+      # 소스 코드 마운트 (개발용)
+      - ./src:/app/src
+      # 데이터 파일 마운트
+      - ./data:/app/data
+      # 환경 변수 파일 마운트
+      - ./.env:/app/.env
+    environment:
+      - PYTHONPATH=/app
+      - PYTHONUNBUFFERED=1
+    ports:
+      - "8000:8000"
+    command: python src/transformer_matcher.py
+    
+  # 개발용 서비스 (소스 코드 변경 시 자동 재시작)
+  ai-agent-dev:
+    build: .
+    container_name: kt_ai_agent_dev
+    volumes:
+      - ./src:/app/src
+      - ./data:/app/data
+      - ./.env:/app/.env
+    environment:
+      - PYTHONPATH=/app
+      - PYTHONUNBUFFERED=1
+    ports:
+      - "8001:8000"
+    command: python src/test_transformer_matcher.py
+    profiles:
+      - dev

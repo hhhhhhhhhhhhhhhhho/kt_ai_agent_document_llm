@@ -126,6 +126,8 @@ def test_model_loading():
         logger.error(f"모델 로딩 테스트 실패: {e}")
 
 
+
+# runpod 에서 실행 endpoint
 if __name__ == "__main__":
     logger.info("Transformers 매처 테스트 시작")
     
