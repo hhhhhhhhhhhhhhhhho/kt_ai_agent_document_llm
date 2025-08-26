@@ -7,7 +7,7 @@ import json
 import os
 from typing import Dict, List, Any
 import logging
-from user import User
+from src.user import User
 from vllm import LLM, SamplingParams
 
 # 로깅 설정
@@ -87,7 +87,7 @@ class VLLMMatcher:
         # 사용자 정보 요약
         user_info = f"""
 사용자 정보:
-- 사업분야: {', '.join(user.category)}
+- 사업분야: {', '.join(user.category_list)}
 - 사업내용: {user.main_business_summary}
 """
         
@@ -110,7 +110,10 @@ class VLLMMatcher:
 3. 지원사업의 구체성과 실용성
 
 각 지원사업에 대해 0-10점의 적합도 점수를 매기고, 7점 이상인 지원사업만 선택해주세요.
-응답 형식: "지원사업 번호: 점수 (선택 이유)"
+응답 형식: "
+{지원사업 이름} : {점수 0/0 형식 }"
+
+
 """
         
         full_prompt = user_info + programs_info + matching_instruction
@@ -132,7 +135,7 @@ class VLLMMatcher:
             relevant_programs = []
             category_indices = {}  # 카테고리별 원본 인덱스 매핑
             
-            for user_category in user.category:
+            for user_category in user.category_list:
                 if user_category in extracted_data:
                     for program in extracted_data[user_category]:
                         relevant_programs.append(program)
@@ -153,7 +156,7 @@ class VLLMMatcher:
             sampling_params = SamplingParams(
                 temperature=0.1,
                 top_p=0.9,
-                max_tokens=1000
+                max_tokens=20000
             )
             
             logger.info("vLLM 매칭 분석 시작...")
@@ -184,23 +187,27 @@ class VLLMMatcher:
             List[Dict]: 매칭된 지원사업 정보
         """
         matched_programs = []
-        
+        name= None
+        score=None
+        analysis=None
         # 간단한 파싱 로직 (실제로는 더 정교한 파싱이 필요할 수 있음)
         lines = vllm_result.strip().split('\n')
         
         for line in lines:
-            if '지원사업' in line and ':' in line:
-                try:
-                    # "지원사업 1: 8점 (선택 이유)" 형태 파싱
-                    parts = line.split(':')
-                    if len(parts) >= 2:
-                        program_num = int(parts[0].replace('지원사업', '').strip()) - 1
-                        
-                        if 0 <= program_num < len(relevant_programs):
-                            matched_programs.append(relevant_programs[program_num])
-                            
-                except (ValueError, IndexError):
-                    continue
+            if "**" in line:
+                name = line.strip('*')
+            elif "- 점수" in line:
+                score = line[6:11]
+            elif "- 분석" in line:
+                analysis = line
+
+            if name is not None and score is not None and analysis is not None:
+                if int(score[:2]) > 7:
+                    matched_programs.append([name,score,analysis])
+                else:
+                    logger.info(f"🤔 {name} 은 {analysis} 이유로 6점 이하 이므로 추천하지 않습니다.")
+
+
         
         # 매칭 결과가 없으면 상위 3개 반환
         if not matched_programs:
@@ -224,24 +231,29 @@ class VLLMMatcher:
                 all_data = json.load(f)
             
             # 매칭된 지원사업의 원본 데이터 수집
-            matched_full_data = {}
-            
-            for program in matched_programs:
-                category = program.get('category', '')
-                original_index = program.get('original_index', 0)
-                
-                if category in all_data and 'jsonArray' in all_data[category]:
-                    if original_index < len(all_data[category]['jsonArray']):
-                        original_program = all_data[category]['jsonArray'][original_index]
-                        
-                        if category not in matched_full_data:
-                            matched_full_data[category] = {'jsonArray': []}
-                        
-                        matched_full_data[category]['jsonArray'].append(original_program)
-            
+            results_with_data = []
+
+            for data_category in all_data:
+                json_array = all_data[data_category]["jsonArray"]
+
+                for name, score, analysis in matched_programs:
+                    # JSON 안에서 name과 일치하는 항목 찾기
+                    matched_item = next((item for item in json_array if item["pblancNm"] == name), None)
+                    if matched_item:
+                        # 원하는 데이터와 함께 저장
+                        results_with_data.append({
+                            "name": name,
+                            "score": score,
+                            "analysis": analysis,
+                            "rceptEngnHmpgUrl": matched_item.get("rceptEngnHmpgUrl"),
+                            "reqstBeginEndDe": matched_item.get("reqstBeginEndDe"),
+                            "bsnsSumryCn": matched_item.get("bsnsSumryCn")
+                        })
             # 결과 저장
+
+            print(f"\n\n\n {results_with_data} \n\n\n")
             with open(output_file, 'w', encoding='utf-8') as f:
-                json.dump(matched_full_data, f, ensure_ascii=False, indent=2)
+                json.dump(results_with_data, f, ensure_ascii=False, indent=2)
             
             logger.info(f"매칭된 지원사업 데이터 저장 완료: {output_file}")
             
@@ -262,19 +274,19 @@ class VLLMMatcher:
         )
         
         # 파일 경로 설정
-        all_categories_file = "src/all_categories.json"
-        output_file = "src/matched_support_programs.json"
+        all_categories_file = "src/data/all_categories.json"
+        output_file = "src/data/matched_support_programs.json"
         
         try:
             
             # 1. all_categories.json에서 pblancNm과 bsnsSumryCn 추출
             logger.info("지원사업 정보 추출 시작...")
             extracted_data = self.extract_support_programs_info(all_categories_file)
-            
+
             # 2. vLLM을 사용한 매칭
             logger.info("vLLM 매칭 시작...")
             matched_programs = self.match_support_programs(user, extracted_data)
-            
+            #print(f"\n\n\n\n {matched_programs}  \n\n\n\n") 
             # 3. 매칭된 지원사업을 원본 데이터와 함께 저장
             logger.info("매칭 결과 저장 시작...")
             self.create_matched_output_file(matched_programs, all_categories_file, output_file)
@@ -285,5 +297,6 @@ class VLLMMatcher:
             logger.error(f"프로세스 실행 중 오류 발생: {e}")
 
 
+
 if __name__ == "__main__":
-    main()
+    pass

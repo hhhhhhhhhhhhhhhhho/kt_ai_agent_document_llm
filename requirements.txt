@@ -4,3 +4,4 @@ transformers>=4.55.0
 accelerate>=1.10.0
 torch>=2.2.0
 numpy<2.0.0
+vllm

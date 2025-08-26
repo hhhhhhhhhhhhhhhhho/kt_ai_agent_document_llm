@@ -37,7 +37,8 @@ if __name__ == "__main__":
 
 
     ### JSON 파일 기반 신청서 작성 ###
-    write_support_program()
+    print("✅ write_support_program() 실행 중 ")
+    #write_support_program()
     
     
     

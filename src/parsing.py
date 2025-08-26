@@ -4,7 +4,7 @@ import os
 from datetime import datetime
 from typing import Dict, List, Optional
 import logging
-from config import Config, CATEGORY_CODES,HASHTAGS
+from src.config import Config, CATEGORY_CODES,HASHTAGS
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -171,7 +171,8 @@ class BizInfoAPI:
         # 새로운 딕셔너리 만들기
         categories = {k: CATEGORY_CODES[k] for k in category_list}
         category_data = {}
-        
+        extract_category_data = {}
+
         for name, code in categories.items():
             logger.info(f"{name} 분야 조회 중...")
             
@@ -183,15 +184,31 @@ class BizInfoAPI:
                 )
                 
                 category_data[name] = data
-                
                 # 개별 파일로도 저장
-                self.save_to_json(data, f"{name}_support_programs.json")
+                self.save_to_json(data, f"data/{name}_support_programs.json")
+                
+                try:
+                    file_path = 'data/all_categories.json'
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        data_for_extract = json.load(f) # 파일에서 JSON 데이터를 읽어와 Python 딕셔너리로 변환
+                    
+                    print(f"'{file_path}' 파일에서 데이터를 성공적으로 로드했습니다.\n")
+                    print(type(data_for_extract))
+
+                    for section in data_for_extract:
+                        for support_porgram in data_for_extract[section]['jsonArray']:
+                            extract_category_data[support_porgram['pblancNm']] = support_porgram['bsnsSumryCn']
+                    file_path = self.save_to_json(extract_category_data,"src/data/extract_catories.json")
+                    print(f'✅ {file_path} 필드 추출본 파일 저장 성공')        
+                    logger.info(f'✅ {file_path} 필드 추출본 파일 저장 성공')        
+                except Exception as e:
+                    logger.error(f"Extract 저장 실패 {e}")
                 
             except Exception as e:
                 logger.error(f"{name} 분야 조회 실패: {e}")
         
         # 전체 분야 데이터를 하나의 파일로 저장
-        filepath = self.save_to_json(category_data, "all_categories.json")
+        filepath = self.save_to_json(category_data, "data/all_categories.json")
         logger.info(f"전체 분야 데이터 저장 완료: {filepath}")
 
 
