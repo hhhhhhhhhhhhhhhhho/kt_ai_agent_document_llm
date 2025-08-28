@@ -188,7 +188,7 @@ class BizInfoAPI:
                 self.save_to_json(data, f"data/{name}_support_programs.json")
                 
                 try:
-                    file_path = 'data/all_categories.json'
+                    file_path = 'src/data/all_categories.json'
                     with open(file_path, 'r', encoding='utf-8') as f:
                         data_for_extract = json.load(f) # 파일에서 JSON 데이터를 읽어와 Python 딕셔너리로 변환
                     
@@ -198,7 +198,7 @@ class BizInfoAPI:
                     for section in data_for_extract:
                         for support_porgram in data_for_extract[section]['jsonArray']:
                             extract_category_data[support_porgram['pblancNm']] = support_porgram['bsnsSumryCn']
-                    file_path = self.save_to_json(extract_category_data,"src/data/extract_catories.json")
+                    file_path = self.save_to_json(extract_category_data,"data/extract_catories.json")
                     print(f'✅ {file_path} 필드 추출본 파일 저장 성공')        
                     logger.info(f'✅ {file_path} 필드 추출본 파일 저장 성공')        
                 except Exception as e:

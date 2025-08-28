@@ -8,7 +8,7 @@ import os
 from typing import Dict, List, Any
 import logging
 from src.user import User
-from vllm import LLM, SamplingParams
+from langchain_community.llms import VLLM
 
 # 로깅 설정
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -26,12 +26,15 @@ class VLLMMatcher:
         self.model_name = model_name
         self.llm = None
         self._initialize_llm()
+
     
     def _initialize_llm(self):
         """vLLM 모델 초기화"""
         try:
             logger.info(f"vLLM 모델 초기화 중: {self.model_name}")
-            self.llm = LLM(model=self.model_name)
+            self.llm = VLLM(model=self.model_name,
+                            trust_remote_code=True,
+                             max_new_tokens=10000)
             logger.info("vLLM 모델 초기화 완료")
         except Exception as e:
             logger.error(f"vLLM 모델 초기화 실패: {e}")
@@ -110,9 +113,12 @@ class VLLMMatcher:
 3. 지원사업의 구체성과 실용성
 
 각 지원사업에 대해 0-10점의 적합도 점수를 매기고, 7점 이상인 지원사업만 선택해주세요.
-응답 형식: "
-{지원사업 이름} : {점수 0/0 형식 }"
+각 항목마다 개행을 하세요. 지원사업 이름은 원본 그대로 사용하세요.
 
+각 지원사업마다 아래의 형식으로 평가하고
+{지원사업 이름}
+점수 : {0/0}
+{분석 결과} 
 
 """
         
@@ -153,17 +159,12 @@ class VLLMMatcher:
             prompt = self.create_matching_prompt(user, relevant_programs)
             
             # vLLM 추론
-            sampling_params = SamplingParams(
-                temperature=0.1,
-                top_p=0.9,
-                max_tokens=20000
-            )
-            
+                        
             logger.info("vLLM 매칭 분석 시작...")
-            outputs = self.llm.generate([prompt], sampling_params)
-            result = outputs[0].outputs[0].text
+            result = self.llm.invoke(prompt)
+        
             
-            logger.info(f"vLLM 분석 결과: {result}")
+            logger.info(f"vLLM 분석 결과: {result}\n\n The Type of reuslt{result}")
             
             # 결과 파싱 및 매칭된 지원사업 추출
             matched_programs = self._parse_matching_result(result, relevant_programs, category_indices)
@@ -192,13 +193,25 @@ class VLLMMatcher:
         analysis=None
         # 간단한 파싱 로직 (실제로는 더 정교한 파싱이 필요할 수 있음)
         lines = vllm_result.strip().split('\n')
-        
+
+        print(f" LLM OUTPUT 은 다음과 같습니다. \n {lines}")
+        print()
+        print()
+        print()
+        print()
         for line in lines:
             if "**" in line:
                 name = line.strip('*')
+                if int(name[1]) =='.':
+                    name = name[3:]
+                else:
+                    name = name[4:]
+                logger.info(f"🤖 DEBUG : {line.strip('*')}")
             elif "- 점수" in line:
+                logger.info(f"🤖 DEBUG : {line[6:11]}")
                 score = line[6:11]
             elif "- 분석" in line:
+                logger.info(f"🤖 DEBUG : {line}")
                 analysis = line
 
             if name is not None and score is not None and analysis is not None:
@@ -206,7 +219,6 @@ class VLLMMatcher:
                     matched_programs.append([name,score,analysis])
                 else:
                     logger.info(f"🤔 {name} 은 {analysis} 이유로 6점 이하 이므로 추천하지 않습니다.")
-
 
         
         # 매칭 결과가 없으면 상위 3개 반환
@@ -286,7 +298,7 @@ class VLLMMatcher:
             # 2. vLLM을 사용한 매칭
             logger.info("vLLM 매칭 시작...")
             matched_programs = self.match_support_programs(user, extracted_data)
-            #print(f"\n\n\n\n {matched_programs}  \n\n\n\n") 
+            print(f"\n\n\n\n✅ 매칭 된 프로그램은 다음과 같습니다. {matched_programs}  \n\n\n\n") 
             # 3. 매칭된 지원사업을 원본 데이터와 함께 저장
             logger.info("매칭 결과 저장 시작...")
             self.create_matched_output_file(matched_programs, all_categories_file, output_file)
